@@ -1,0 +1,9 @@
+---
+- name: reload udev rules
+  command: "udevadm control -R"
+
+- name: reload systemd
+  command: "systemctl daemon-reload"
+
+- name: restart rsyslogd
+  service: state=restarted name=rsyslog

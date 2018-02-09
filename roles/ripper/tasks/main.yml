@@ -1,0 +1,133 @@
+---
+- name: Enable forwarding of syslog messages to broadcast
+  copy: src=fwd-to-broadcast.conf dest=/etc/rsyslog.d
+  notify:
+    - restart rsyslogd
+
+- name: Setup sudo
+  become_method: su # We don't have sudo yet
+  block:
+    - name: Update apt
+      apt:
+        update_cache: true
+
+    - name: Install sudo
+      apt:
+        name: sudo
+        state: present
+
+    - name: Enable sudo for ansible
+      user:
+        name: "{{ ansible_user }}"
+        groups: sudo
+        append: yes
+
+- name: Install repositories
+  apt_repository:
+    state: present
+    repo: "{{ item }}"
+    update_cache: yes
+  with_items: "{{ apt_repos }}"
+
+- name: Create USB device group
+  group: name="{{ usb_devices_group }}" state=present
+
+- name: Install dependencies
+  apt:
+    name: "{{ apt_dependencies }}"
+    state: present
+
+- name: Enable access to serial ports and CDROMs
+  user:
+    name: "{{ ansible_user }}"
+    groups:
+      - dialout
+      - cdrom
+      - "{{ usb_devices_group }}"
+    append: yes
+
+- name: Setup group for camera device
+  template: src=camera.rules.j2 dest=/etc/udev/rules.d
+  notify:
+    - udev reload
+
+- name: Create chdkptp dir
+  file: state=directory path="{{ chdkptp_root }}"
+
+- name: Clone chdkptp git repository
+  git: dest="{{ chdkptp_root }}" repo=https://github.com/mgrela/chdkptp.git
+
+- name: Build chdkptp
+  command: "make LUA_INCLUDE_DIR=/usr/include/lua5.1 LUA_LIB=lua5.1"
+  args:
+    chdir: "{{ chdkptp_root }}/trunk"
+    creates: "{{ chdkptp_root }}/trunk/chdkptp"
+
+- name: Stow script to /usr/local/bin
+  file: state=link src="{{ chdkptp_root }}/trunk/chdkptp.sh" dest="{{ binroot }}/chdkptp.sh" 
+
+- name: Create directory for python modules
+  file: state=directory dest="{{ pythonroot }}"
+
+- name: Upload Python modules
+  copy: dest="{{ pythonroot }}" src="{{ item }}"
+  with_items: "{{ python_modules }}"
+
+- name: Upload shell modules
+  copy: dest="{{ binroot }}" src="{{ item }}"
+  with_items: "{{ bash_modules }}"
+
+- name: Upload scripts
+  copy: dest="{{ binroot }}" src="{{ item }}" mode=+x
+  with_items: "{{ scripts }}"
+
+- name: Upload systemd files
+  template: src=brain.service.j2 dest=/etc/systemd/system/brain.service
+  notify:
+    - reload systemd
+
+- name: Upload sudo configuration
+  template: src=mount-storage.j2 dest=/etc/sudoers.d/mount-storage
+
+- name: Create storage dir
+  file: state=directory path="{{ storage_root }}"
+
+- name: Create cdctl dir
+  file: state=directory path="{{ cdctl_root }}"
+
+- name: Download and extract cdctl
+  get_url:
+    url: http://ftp.fi.debian.org/gentoo/distfiles/cdctl-0.16.tar.gz
+    checksum: sha256:b98c17accd72fdc12dd4cd4dfe9f198b961e44c6bc15f62085e71766858eaa7f
+    dest: "{{ cdctl_root }}"
+
+- name: Extract sources
+  unarchive: src="{{ cdctl_root }}/cdctl-0.16.tar.gz" dest="{{ cdctl_root }}" remote_src=yes
+
+- name: Configure and build sources
+  block:
+    - file: state=touch dest="{{ cdctl_root }}/cdctl/SEGFAULTS" # This is needed by the Makefile
+    - command: autoheader
+      args:
+        chdir: "{{ cdctl_root }}/cdctl"
+        creates: "{{ cdctl_root }}/cdctl/config.h.in"
+    - command: autoconf
+      args:
+        chdir: "{{ cdctl_root }}/cdctl"
+        creates: "{{ cdctl_root }}/cdctl/configure"
+    - command: ./configure --prefix={{ prefix }}
+      args:
+        chdir: "{{ cdctl_root }}/cdctl"
+        creates: "{{ cdctl_root }}/cdctl/Makefile"
+    - command: make all
+      args:
+        chdir: "{{ cdctl_root }}/cdctl"
+        creates: "{{ cdctl_root }}/cdctl/cdctl"
+    - command: make install
+      args:
+        chdir: "{{ cdctl_root }}/cdctl"
+        creates: "{{ prefix }}/bin/cdctl"
+
+- name: Start and enable the brain service
+  service: state=started enabled=yes name=brain.service
+

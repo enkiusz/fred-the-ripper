@@ -1,0 +1,50 @@
+apt_repos:
+  - deb http://deb.debian.org/debian testing main
+
+apt_dependencies:
+  - python3-serial
+  - python3-opencv
+  - build-essential
+  - libopencv-contrib3.3
+  - libusb-dev
+  - liblua5.1-dev
+  - eject
+  - cdrdao
+  - wodim
+  - uuid-runtime
+  - git
+  - jq
+  - python3-psutil
+
+
+# The group used to allow access to USB devices via libusb (such as the camera)
+usb_devices_group: usb
+
+robot_root: /opt/fred
+chdkptp_root: /opt/fred/chdkptp
+cdctl_root: /opt/fred/cdctl
+
+storage_root: /mnt/storage
+
+etcroot: /etc
+prefix: /usr/local
+binroot: /usr/local/bin
+python_version: 3.6
+pythonroot: /usr/local/lib/python3.6/dist-packages
+
+python_modules:
+  - uarm.py
+  - vision.py
+  - drive.py
+  - storage.py
+  - config.py
+
+scripts:
+  - brain.py
+  - shoot-photo.sh
+  - plastic-archiver.sh
+  - marker-generate.py
+
+bash_modules:
+  - log4bash.sh
+

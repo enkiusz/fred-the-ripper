@@ -37,7 +37,6 @@ python_modules:
   - vision.py
   - drive.py
   - storage.py
-  - config.py
 
 scripts:
   - brain.py

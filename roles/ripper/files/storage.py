@@ -4,6 +4,7 @@ import subprocess
 import logging
 import re
 import psutil
+import os
 
 class Storage:
     def __init__(self):
@@ -34,7 +35,7 @@ class Storage:
 
         # Check if storage is mounted
         if not self.storage_available():
-            proc = subprocess.run(['sudo', 'mount', self.device, self.path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            proc = subprocess.run(['sudo', 'mount', self.device, self.path, '-o', 'uid={},gid={}'.format(os.getuid(), os.getgid())], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             if proc.returncode == 0:
                 return True

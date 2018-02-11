@@ -69,6 +69,9 @@
 - name: Create directory for python modules
   file: state=directory dest="{{ pythonroot }}"
 
+- name: Upload Python configuration file
+  template: src=config.py.j2 dest="{{ pythonroot }}/config.py"
+
 - name: Upload Python modules
   copy: dest="{{ pythonroot }}" src="{{ item }}"
   with_items: "{{ python_modules }}"

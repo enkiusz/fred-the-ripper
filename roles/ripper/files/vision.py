@@ -155,6 +155,9 @@ class Vision:
         else:
             self.log.warn("No circles detected on image, using calibration data directly")
 
+        # Enlarge the cover circle a bit to reduce cutting of small text on the edges
+        r = int(r*1.05)
+
         if self.log.isEnabledFor(logging.DEBUG):
             # Draw the mask circle
             cv2.circle(img, p, r, (255,255,255),5)

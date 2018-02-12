@@ -69,6 +69,15 @@
 - name: Create directory for python modules
   file: state=directory dest="{{ pythonroot }}"
 
+- name: Setup tmpfiles.d
+  template: src=fred.conf.j2 dest=/etc/tmpfiles.d/fred.conf
+
+- name: Create tmpfiles.d
+  command: systemd-tmpfiles --create /etc/tmpfiles.d/fred.conf creates=/run/fred/*
+
+- name: Upload lcd4linux configuration
+  template: src=lcd4linux.conf.j2 dest=/etc/lcd4linux.conf
+
 - name: Upload Python configuration file
   template: src=config.py.j2 dest="{{ pythonroot }}/config.py"
 
@@ -130,6 +139,9 @@
       args:
         chdir: "{{ cdctl_root }}/cdctl"
         creates: "{{ prefix }}/bin/cdctl"
+
+- name: Start and enable the lcd4linux service
+  service: state=started enabled=yes name=lcd4linux.service
 
 - name: Start and enable the brain service
   service: state=started enabled=yes name=brain.service

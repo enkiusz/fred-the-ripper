@@ -1,0 +1,5 @@
+# Type Path          Mode UID  GID  Age Argument
+d /mnt/storage       -    -    -    -   
+d /run/fred          -    {{ ansible_user }}    {{ ansible_user }}    -
+f /run/fred/line1    -    {{ ansible_user }}    {{ ansible_user }}    -   NO STATUS\n
+f /run/fred/line2    -    {{ ansible_user }}    {{ ansible_user }}    -   CHECK ENGINE\n

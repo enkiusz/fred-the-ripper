@@ -1,0 +1,26 @@
+Display LCD2USB {
+	Driver 'LCD2USB'
+	Size '16x2'
+}
+
+Widget status_line1 {
+    class 'Text'
+    expression file::readline('/run/fred/line1', 1)
+    width 16
+    update 500
+}
+
+Widget status_line2 {
+    class 'Text'
+    expression file::readline('/run/fred/line2', 1)
+    width 16
+    update 500
+}
+
+Layout Status {
+    Row01.Col1 'status_line1'
+    Row02.Col1 'status_line2'
+}
+
+Display 'LCD2USB'
+Layout 'Status'

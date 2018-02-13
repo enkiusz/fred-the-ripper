@@ -15,6 +15,7 @@ apt_dependencies:
   - git
   - jq
   - python3-psutil
+  - lcd4linux
 
 
 # The group used to allow access to USB devices via libusb (such as the camera)
@@ -37,6 +38,7 @@ python_modules:
   - vision.py
   - drive.py
   - storage.py
+  - display.py
 
 scripts:
   - brain.py

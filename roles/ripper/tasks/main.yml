@@ -80,18 +80,22 @@
 
 - name: Upload Python configuration file
   template: src=config.py.j2 dest="{{ pythonroot }}/config.py"
+  tags: run
 
 - name: Upload Python modules
   copy: dest="{{ pythonroot }}" src="{{ item }}"
   with_items: "{{ python_modules }}"
+  tags: run
 
 - name: Upload shell modules
   copy: dest="{{ binroot }}" src="{{ item }}"
   with_items: "{{ bash_modules }}"
+  tags: run
 
 - name: Upload scripts
   copy: dest="{{ binroot }}" src="{{ item }}" mode=+x
   with_items: "{{ scripts }}"
+  tags: run
 
 - name: Upload systemd files
   template: src=brain.service.j2 dest=/etc/systemd/system/brain.service

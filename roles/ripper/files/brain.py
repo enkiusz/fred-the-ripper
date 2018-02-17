@@ -47,7 +47,7 @@ while True:
 log.info("Getting list of storage")
 display.msg("DETECT STORAGE")
 
-storage = Storage()
+storage = Storage(config)
 while True:
     if storage.detect() is True:
         break
@@ -230,13 +230,13 @@ while True:
     arm.move_abs(config.drive_tray_pos)
     arm.wait_for_move_end()
 
-    drive.close_tray()
-
     arm.move_abs(dest_tray)
     arm.wait_for_move_end()
 
     arm.pump(False)
     time.sleep(config.t_release)
+
+    drive.close_tray()
 
     arm.origin()
 

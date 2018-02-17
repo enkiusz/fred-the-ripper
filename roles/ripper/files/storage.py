@@ -7,9 +7,10 @@ import psutil
 import os
 
 class Storage:
-    def __init__(self):
+    def __init__(self, config):
         self.log = logging.getLogger(__name__)
         self.path = '/mnt/storage'
+        self.config = config
 
     def storage_available(self):
         parts = [part for part in psutil.disk_partitions() if part.mountpoint == self.path and part.device == self.device]
@@ -22,16 +23,14 @@ class Storage:
             return None
 
     def detect(self):
-        proc = subprocess.run("lsblk --json --output NAME,RM,RO,TYPE,FSTYPE | jq -r '.blockdevices | map(select(.rm == \"1\" and .type == \"disk\")) | first | .children | map(select(.fstype != \"iso9660\")) | first | .name'", shell=True, check=True, stdout=subprocess.PIPE)
-        dev = proc.stdout.decode('ascii').rstrip()
+        proc = subprocess.run("lsblk -lpn --output LABEL,NAME | grep -F -- {}".format(self.config.storage_fs_label), shell=True, check=True, stdout=subprocess.PIPE)
+        self.device = proc.stdout.decode('ascii').rstrip().split()[1]
 
         if proc.returncode != 0:
             return False
-        if not re.match('sd[a-z][1-9][0-9]?', dev):
-            log.error("Unexpected device detected as storage: '{}'".format(proc.stdout))
+        if not re.match('/dev/sd[a-z][1-9][0-9]?', self.device):
+            self.log.error("Unexpected device detected as storage: '{}'".format(proc.stdout))
             return False
-
-        self.device = '/dev/{}'.format(dev)
 
         # Check if storage is mounted
         if not self.storage_available():
@@ -40,16 +39,18 @@ class Storage:
             if proc.returncode == 0:
                 return True
             else:
-                log.error("Could not mount device '{}' into '{}', return code is '{}', output is '{}' stderr is '{}'".format(self.device, self.path, proc.returncode, proc.stdout, proc.stderr))
+                self.log.error("Could not mount device '{}' into '{}', return code is '{}', output is '{}' stderr is '{}'".format(self.device, self.path, proc.returncode, proc.stdout, proc.stderr))
                 return False
         else:
             return True
 
 if __name__ == "__main__":
+    import config
+
     logging.basicConfig(level=logging.DEBUG)
 
     log = logging.getLogger(__name__)
-    storage = Storage()
+    storage = Storage(config)
 
     result = storage.detect()
     log.info("Detection returned {}".format(result))

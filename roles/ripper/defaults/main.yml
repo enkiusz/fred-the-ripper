@@ -42,6 +42,7 @@ python_modules:
 
 scripts:
   - brain.py
+  - ripper.py
   - shoot-photo.sh
   - plastic-archiver.sh
   - marker-generate.py

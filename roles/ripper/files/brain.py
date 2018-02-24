@@ -8,6 +8,7 @@ import logging
 import os
 import subprocess
 import uuid
+import json
 from uarm import UArm
 from vision import Vision
 from drive import Drive
@@ -21,6 +22,8 @@ log = logging.getLogger(__name__)
 
 display = Display(config)
 
+arm_device = None
+serial_port = None
 arm = None
 
 display.msg("DETECT ARM")
@@ -32,8 +35,10 @@ while True:
 
         log.debug("Probing for UArm on serial port '{}' ({})".format(s.device, s.hwid))
 
-        arm = UArm(serial.Serial(port=s.device, baudrate=115200, timeout=config.serial_port_timeout), config)
+        serial_port = serial.Serial(port=s.device, baudrate=115200, timeout=config.serial_port_timeout)
+        arm = UArm(serial_port, config)
         if arm.connect():
+            arm_device = s.device
             log.info("Detected UArm on device {}".format(s.device))
             display.msg("ARM OK")
 
@@ -131,6 +136,9 @@ while True:
 log.info("Camera calibration was successful, calibration markers detected: {}".format(calibration_markers))
 display.msg("VISION OK")
 
+with open(config.calibration_filename, 'w') as f:
+    json.dump(calibration_markers, f)
+
 while True:
 
     log.info("Waiting for a disc to be placed in the source tray")
@@ -162,83 +170,21 @@ while True:
 
         time.sleep(config.sensor_delay)
 
+    # Close the serial port so that the ripper.py script can open it again
+    serial_port.close()
+
     capture_id = str(uuid.uuid4())
-    log.info("Starting capture {}".format(capture_id))
-    display.msg("STARTING CAPTURE")
 
-    # Pickup disk
-    cd_pickedup = arm.pickup_object(config.src_tray_pos, config.src_tray_z_min)
-    if not cd_pickedup:
-        log.fatal("Could not pick up disk, bailing out")
-        display.msg("COULD NOT PICKUP DISK")
-        break
+    capture_unit_name = 'ripper@{}.service'.format(capture_id)
+    subprocess.call(['sudo', 'systemd-run', '--uid', str(os.getuid()), '--unit', capture_unit_name, '--wait', 'ripper.py', '--arm-device', arm_device, '--capture-id', capture_id, '--storage-path', storage_path, '--calibration-markers', config.calibration_filename])
 
-    arm.pump(True)
-    time.sleep(config.t_grab)
+    # Store the logs
+    os.system("journalctl -a --utc -o short-iso _SYSTEMD_UNIT={} > {}/{}/log.txt".format(capture_unit_name, storage_path, capture_id))
 
-    arm.move_abs(config.src_tray_pos)
-    arm.wait_for_move_end()
-
-    drive.open_tray()
-
-    arm.move_abs(config.drive_tray_pos)
-    arm.wait_for_move_end()
-
-    arm.pump(False)
-    time.sleep(config.t_release)
-
-    arm.origin()
-
-    for i in range(config.close_tray_max_attempts):
-        if drive.close_tray():
-            break
-
-        log.warn("Could not close drive tray, retry '{}' of '{}'".format(i, config.close_tray_max_attempts))
-        display.msg("CANNOT CLOSE TRAY, OPENING")
-        drive.open_tray()
-
-    # Move the arm away so that the camera can make a photo of the disc
-    arm.move_abs(config.src_tray_pos)
-
-    log.info("Archiving disc in drive tray")
-    display.msg("ARCHIVING DISK IN DRIVE")
-
-    dest_tray = config.done_tray_pos
-
-    # dest_tray  = (-102, 96, 100) # [mm]
-
-    if not drive.read_disc(capture_id):
-        log.warn("Disk could not be imaged, putting it onto error tray")
-        display.msg("COULD NOT IMAGE DISK, PUTTING TO FAILED TRAY")
-        dest_tray = config.error_tray_pos
-
-    drive.open_tray()
-
-    tmp_image_filename = vision.image_acquire()
-    vision.write_cover_image(tmp_image_filename, '{}/{}/cover.png'.format(storage_path, capture_id), calibration_markers)
-    os.unlink(tmp_image_filename)
-
-    cd_pickedup = arm.pickup_object(config.drive_tray_pos, config.drive_tray_z_min)
-    if not cd_pickedup:
-        log.fatal("Could not pick up CD, bailing out")
-        display.msg("CANNOT PICKUP DISK, BAILING OUT")
-        break
-
-    arm.pump(True)
-    time.sleep(config.t_grab)
-
-    arm.move_abs(config.drive_tray_pos)
-    arm.wait_for_move_end()
-
-    arm.move_abs(dest_tray)
-    arm.wait_for_move_end()
-
-    arm.pump(False)
-    time.sleep(config.t_release)
-
-    drive.close_tray()
-
-    arm.origin()
+    # Reopen the UArm device
+    serial_port = serial.Serial(port=arm_device, baudrate=115200, timeout=config.serial_port_timeout)
+    arm = UArm(serial_port, config)
+    arm.connect()
 
 arm.origin()
 s.close()

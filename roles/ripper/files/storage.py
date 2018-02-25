@@ -5,6 +5,7 @@ import logging
 import re
 import psutil
 import os
+import pwd
 
 class Storage:
     def __init__(self, config):
@@ -34,7 +35,13 @@ class Storage:
 
         # Check if storage is mounted
         if not self.storage_available():
-            proc = subprocess.run(['sudo', 'mount', self.device, self.path, '-o', 'uid={},gid={}'.format(os.getuid(), os.getgid())], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # This is for VFAT
+            # proc = subprocess.run(['sudo', 'mount', self.device, self.path, '-o', 'uid={},gid={}'.format(os.getuid(), os.getgid())], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+            # This is for EXT2/3/4 and other filesystems with UNIX-style permissions
+            proc = subprocess.run(['sudo', 'mount', self.device, self.path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # Change ownership of root storage path so that we can create files there
+            os.system("sudo chown {} {}".format(pwd.getpwuid(os.getuid()).pw_name, self.path))
 
             if proc.returncode == 0:
                 return True

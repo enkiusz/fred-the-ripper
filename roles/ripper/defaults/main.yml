@@ -16,6 +16,7 @@ apt_dependencies:
   - jq
   - python3-psutil
   - lcd4linux
+  - ffmpeg # For debugcam
 
 
 # The group used to allow access to USB devices via libusb (such as the camera)
@@ -46,6 +47,7 @@ scripts:
   - shoot-photo.sh
   - plastic-archiver.sh
   - marker-generate.py
+  - record.sh
 
 bash_modules:
   - log4bash.sh

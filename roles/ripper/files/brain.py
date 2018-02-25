@@ -175,11 +175,22 @@ while True:
 
     capture_id = str(uuid.uuid4())
 
+    # We need to make the capture dir before so that we can record into it
+    os.mkdir("{}/{}".format(storage_path, capture_id))
+
+    debugcam_unit_name = 'debugcam@{}.service'.format(capture_id)
+    log.info("Starting debugcam for capture id '{}'".format(capture_id))
+    subprocess.call(['sudo', 'systemd-run', '--uid', str(os.getuid()), '--unit', debugcam_unit_name, 'record.sh', config.debugcam_device, '{}/{}'.format(storage_path, capture_id)])
+
     capture_unit_name = 'ripper@{}.service'.format(capture_id)
+    log.info("Starting ripper for capture id '{}'".format(capture_id))
     subprocess.call(['sudo', 'systemd-run', '--uid', str(os.getuid()), '--unit', capture_unit_name, '--wait', 'ripper.py', '--arm-device', arm_device, '--capture-id', capture_id, '--storage-path', storage_path, '--calibration-markers', config.calibration_filename])
+
+    subprocess.call(['sudo', 'systemctl', 'stop', debugcam_unit_name])
 
     # Store the logs
     os.system("journalctl -a --utc -o short-iso _SYSTEMD_UNIT={} > {}/{}/log.txt".format(capture_unit_name, storage_path, capture_id))
+    os.system("journalctl -a --utc -o short-iso _SYSTEMD_UNIT={} > {}/{}/debugcam-log.txt".format(debugcam_unit_name, storage_path, capture_id))
 
     # Reopen the UArm device
     serial_port = serial.Serial(port=arm_device, baudrate=115200, timeout=config.serial_port_timeout)

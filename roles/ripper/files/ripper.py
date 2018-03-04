@@ -51,19 +51,21 @@ with open(args.calibration_markers_file, 'r') as f:
 log.info("Calibration data loaded from '{}': {}".format(args.calibration_markers_file, calibration_markers))
 
 log.info("Starting capture")
-display.msg("STARTING CAPTURE")
 
-log.info("Picking up from source tray")
+log.info("Picking up disk from source tray")
+display.msg("PICKUP SRC TRAY")
 
 # Pickup disk
 cd_pickedup = arm.pickup_object(config.src_tray_pos, config.src_tray_z_min)
 if not cd_pickedup:
     log.fatal("Could not pick up disk, bailing out")
-    display.msg("COULD NOT PICKUP DISK")
+    display.msg("ERR PICKUP DISK")
     sys.exit(1)
 
 arm.pump(True)
 time.sleep(config.t_grab)
+
+display.msg("MOVE TO DRIVE")
 
 arm.move_abs(config.src_tray_pos)
 arm.wait_for_move_end()
@@ -83,38 +85,46 @@ for i in range(config.close_tray_max_attempts):
         break
 
     log.warn("Could not close drive tray, retry '{}' of '{}'".format(i, config.close_tray_max_attempts))
-    display.msg("CANNOT CLOSE TRAY, OPENING")
+    display.msg("ERR DRIVE CLOSE")
     drive.open_tray()
 
 # Move the arm away so that the camera can make a photo of the disc
 arm.move_abs(config.src_tray_pos)
 
 log.info("Archiving disc in drive tray")
-display.msg("ARCHIVING DISK IN DRIVE")
+display.msg("IMAGING ...")
 
 dest_tray = config.done_tray_pos
 
 if not drive.read_disc(capture_id):
-    log.warn("Disk could not be imaged, putting into FAILED tray")
-    display.msg("COULD NOT IMAGE DISK, PUTTING TO FAILED TRAY")
+    log.error("Disk could not be imaged, putting into FAILED tray")
+    display.msg("IMAGING FAIL")
     dest_tray = config.error_tray_pos
 else:
     log.info("Disc successfuly imaged, putting to DONE tray")
 
 drive.open_tray()
 
-tmp_image_filename = vision.image_acquire()
-vision.write_cover_image(tmp_image_filename, '{}/{}/cover.png'.format(storage_path, capture_id), calibration_markers)
-os.unlink(tmp_image_filename)
+try:
+    tmp_image_filename = vision.image_acquire()
+    vision.write_cover_image(tmp_image_filename, '{}/{}/cover.png'.format(storage_path, capture_id), calibration_markers)
+except:
+    log.error("Could not acquire image and write a cover file")
+    display.msg("ERR ACQ. COVER IMG")
+    dest_tray = config.error_tray_pos
+finally:
+    os.unlink(tmp_image_filename)
 
 cd_pickedup = arm.pickup_object(config.drive_tray_pos, config.drive_tray_z_min)
 if not cd_pickedup:
     log.fatal("Could not pick up CD, bailing out")
-    display.msg("CANNOT PICKUP DISK, BAILING OUT")
+    display.msg("ERR DISK PICKUP")
     sys.exit(1)
 
 arm.pump(True)
 time.sleep(config.t_grab)
+
+display.msg("MOVE TO DST TRAY")
 
 arm.move_abs(config.drive_tray_pos)
 arm.wait_for_move_end()

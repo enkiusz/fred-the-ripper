@@ -172,3 +172,52 @@ class UArm:
         self.log.fatal("An unforseen state has been detected, reached position '{}' with z_min '{}' and switch state '{}'".format(pz, z_min, limit_switch))
         return None
 
+def main():
+
+    import config
+    import logging
+    import serial
+    import time
+    import sys
+
+    logging.basicConfig(level=logging.DEBUG)
+    log = logging.getLogger(__name__)
+
+    log.info("Testing arm subsystem")
+
+    uarm_device = sys.argv[1]
+
+    serial_port = serial.Serial(port=uarm_device, baudrate=115200, timeout=config.serial_port_timeout)
+    arm = UArm(serial_port, config)
+    if arm.connect():
+        log.info("Detected UArm on device {}".format(uarm_device))
+    else:
+        log.fatal("Could not connect to uArm on device {}".format(uarm_device))
+
+    #
+    # Wait for a disc to be detected in the source tray
+    #
+    while True:
+        # Switch off LED
+        arm.digitalout(config.led_drive_pin, False)
+        led_off = arm.analogread(config.sensor_voltage_pin)
+
+        time.sleep(config.sensor_delay)
+
+        # Switch on LED
+        arm.digitalout(config.led_drive_pin, True)
+        led_on = arm.analogread(config.sensor_voltage_pin)
+
+        signal = led_on - led_off
+
+        log.debug("A{} readout led on D{} off '{}' led on '{}' signal '{}'".format(config.sensor_voltage_pin, config.led_drive_pin,
+                                                                                   led_off, led_on, signal))
+
+        if signal > config.detect_threshold:
+            log.info("Disc detected in source tray (signal value is '{}')".format(signal))
+            break
+
+        time.sleep(config.sensor_delay)
+
+if __name__ == "__main__":
+    main()

@@ -8,9 +8,8 @@ log4bash_timefmt="+%Y-%m-%dT%H:%M:%S%z"
 # Default configuration
 CAPTURE_BASEDIR=.
 CAPTURE_ID=$(uuidgen)
-unset RAW_RAW_FIGHT_THE_POWAH
 
-usage() { echo "Usage: $0 [-i <CAPTURE_ID>] [-o <capture_basedir>] [-R] <reader_device>" 1>&2; exit 1; }
+usage() { echo "Usage: $0 [-i <CAPTURE_ID>] [-o <capture_basedir>] <reader_device>" 1>&2; exit 1; }
 
 while getopts ":i:o:R" o; do
     case "${o}" in
@@ -19,9 +18,6 @@ while getopts ":i:o:R" o; do
             ;;
         i)
             CAPTURE_ID="$OPTARG"
-            ;;
-        R)
-            RAW_RAW_FIGHT_THE_POWAH=true
             ;;
         *)
             usage
@@ -84,44 +80,25 @@ fi
 
 mkdir contents
 
+readonly cdrdao_tocfile=toc.txt
+readonly cdrdao_datafile=data.bin
+
+run_cdrdao() {
+    if ! cdrdao read-cd --device "$reader_device" --datafile "$cdrdao_datafile" "$cdrdao_tocfile"; then
+        log_warning "Disk could not be read normally (usually due to L-EC errors), attemptin raw read instead"
+        rm -f "$cdrdao_tocfile" "$cdrdao_datafile"
+        cdrdao read-cd --device "$reader_device" --datafile "$cdrdao_datafile" --read-raw "$cdrdao_tocfile" || exit $?
+    fi
+}
 
 case $disk_type in
     no-disc)
         log_error "Disk not detected"
         exit 1
         ;;
-    audio-cd)
-        mcn=$(cdctl -m)
-        echo "$mcn" > mcn.txt
-
-        log_debug "Disk MCN/UPC is '$mcn'"
+    audio-cd|type-1-data)
         pushd contents 2> /dev/null
-
-        # cdrdao or cdparanoia???
-        cdrdao read-cd --device "$reader_device" ${RAW_RAW_FIGHT_THE_POWAH:+--read-raw} toc.txt
-
-        # if [ -x $(which cdparanoia) ]; then
-        #     cdparanoia -Q > cdparanoia-toc.txt 2>&1 
-        #     cdparanoia -d "$reader_device" -l 
-
-        #     # Needs more info for audioCD support
-        #     # abcde?
-        #     # https://bbs.archlinux.org/viewtopic.php?id=32471
-        #     # https://www.mail-archive.com/flac@xiph.org/msg00040.html
-
-        #     #
-        #     # cdrdao to read TOC, convert to cue file without mkcue
-        #     # cdparanoia or cdrdao to read cd
-        #     # maybe abcde to read as single FLAC
-        # fi
-
-        popd
-
-        ;;
-    type-1-data)
-        pushd contents 2> /dev/null
-        # Should we use --read-raw???
-        cdrdao read-cd --device "$reader_device" ${RAW_RAW_FIGHT_THE_POWAH:+--read-raw} toc.txt
+        run_cdrdao
         popd
         ;;
     *)
@@ -131,4 +108,3 @@ case $disk_type in
 esac
 
 popd
-

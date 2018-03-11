@@ -83,6 +83,10 @@
 - name: Upload Python configuration file
   template: src=config.py.j2 dest="{{ pythonroot }}/config.py"
 
+- name: Create 255.255.255.255 route configuration script
+  template: src=add-broadcast-route.j2 dest=/etc/network/if-pre-up.d/add-broadcast-route mode=+x
+  tags: run
+
 - name: Upload Python modules
   copy: dest="{{ pythonroot }}" src="{{ item }}"
   with_items: "{{ python_modules }}"

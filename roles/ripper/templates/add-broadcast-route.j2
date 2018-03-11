@@ -1,0 +1,27 @@
+#! /bin/sh
+# Add the 255.255.255.255 route to a specified interface
+
+readonly LOG_DEST_IFACE="{{ log_dest_iface }}"
+
+set -e
+
+# Don't bother to restart sshd when lo is configured.
+if [ "$IFACE" = lo ]; then
+	exit 0
+fi
+
+# Only run from ifup.
+if [ "$MODE" != start ]; then
+	exit 0
+fi
+
+if [ "$ADDRFAM" != inet ] && [ "$ADDRFAM" != inet6 ]; then
+	exit 0
+fi
+
+if [ "$IFACE" = "$LOG_DEST_IFACE" ]; then
+	ip l set up dev $LOG_DEST_IFACE
+	ip r add 255.255.255.255/32 dev $LOG_DEST_IFACE
+fi
+
+exit 0

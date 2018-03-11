@@ -113,7 +113,8 @@ except:
     display.msg("ERR ACQ. COVER IMG")
     dest_tray = config.error_tray_pos
 finally:
-    os.unlink(tmp_image_filename)
+    if tmp_image_filename:
+        os.unlink(tmp_image_filename)
 
 cd_pickedup = arm.pickup_object(config.drive_tray_pos, config.drive_tray_z_min)
 if not cd_pickedup:

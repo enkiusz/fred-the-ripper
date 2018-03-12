@@ -9,6 +9,7 @@ import os
 import subprocess
 import uuid
 import json
+import tempfile
 from uarm import UArm
 from vision import Vision
 from drive import Drive
@@ -25,6 +26,9 @@ display = Display(config)
 arm_device = None
 serial_port = None
 arm = None
+
+invocation_id = os.getenv("INVOCATION_ID", str(uuid.uuid4()))
+log.info("Starting brain with invocation '{}'".format(invocation_id))
 
 display.msg("DETECT ARM")
 log.info("Detecting where the robot arm is connected")
@@ -64,6 +68,9 @@ storage_path = storage.path
 
 log.info("Detected storage '{}'".format(storage_path))
 display.msg("STORAGE OK")
+
+invocation_dir = "{}/brain-invocations/{}".format(storage_path, invocation_id)
+os.makedirs(invocation_dir)
 
 vision = Vision(config)
 
@@ -114,7 +121,7 @@ while True:
     log.info("Acquiring calibration image")
     display.msg("IMAGE ACQUIRE")
 
-    image_filename = vision.image_acquire()
+    image_filename = vision.image_acquire(filename=tempfile.mktemp(dir=invocation_dir, prefix="calibration-image-"))
     if not image_filename:
         log.warn("Could not acquire image for calibration, please check the camera")
         display.msg("CANNOT ACQUIRE IMAGE, RETRY IN {} SECONDS".format(config.camera_calibration_delay))
@@ -122,11 +129,12 @@ while True:
         continue
 
     (calibration_markers,frame) = vision.detect_markers(image_filename)
-    os.unlink(image_filename)
 
     log.debug("Markers detected during calibration: '{}'".format(calibration_markers))
 
     if calibration_markers and 'disk_center' in calibration_markers and 'disk_edge' in calibration_markers:
+        if image_filename:
+            os.unlink(image_filename)        # Remove acquired image if calibration was successful
         break
     else:
         log.warn("Both calibration markers need to be detectable, please adjust the camera or lighting conditions")
